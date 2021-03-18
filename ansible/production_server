@@ -1,0 +1,2 @@
+
+production_srvr ansible_host=206.189.236.64 ansible_user=root ansible_python_interpreter=/usr/bin/python3

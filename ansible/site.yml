@@ -1,0 +1,133 @@
+---
+- hosts: production_srvr
+  remote_user: root
+  become: yes
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: Install aptitude using apt
+      apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
+
+    - name: Install required system packages
+      apt: name={{ item }} state=latest update_cache=yes
+      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools', 'zsh']
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt: update_cache=yes name=docker-ce state=latest
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+    
+    - name: Install Docker Compose
+      shell: "curl -L https://github.com/docker/compose/releases/download/1.25.0-rc2/docker-compose-`uname -s`-`uname -m` -o /usr/local/bin/docker-compose"
+
+    - name: Update permissions of docker-compose
+      file:
+        path: /usr/local/bin/docker-compose
+        mode: '755'
+    
+    - name: Add deploy user
+      user:
+        name: deploy
+        shell: /bin/zsh
+        group: docker
+    
+    - name: Download Oh-My-Zsh install.sh
+      get_url:
+        url: https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/master/tools/install.sh
+        dest: /home/deploy/install_oh-my-zsh.sh
+        mode: '0551'
+      become: yes
+      become_user: deploy
+
+    - name: Install Oh-My-Zsh
+      shell: "RUNZSH=no sh /home/deploy/install_oh-my-zsh.sh"
+      become: yes
+      become_user: deploy
+      args:
+        creates: /home/deploy/.oh-my-zsh
+
+    - name: Update Oh-My-Zsh config
+      copy:
+        src: zsh_theme.zsh-theme
+        dest: /home/deploy/.oh-my-zsh/custom/themes/robbyrussell.zsh-theme
+      become: yes
+      become_user: deploy
+
+    - name: Add SSH key to server for deploy user
+      authorized_key:
+        user: deploy
+        key: "{{ ssh_public_key }}"
+
+    - name: Create project-staging directoy
+      file:
+        path: /home/deploy/project-staging
+        state: directory
+        mode: '0755'
+      become: yes
+      become_user: deploy
+
+    - name: Create project-dev directoy
+      file:
+        path: /home/deploy/project-dev
+        state: directory
+        mode: '0755'
+      become: yes
+      become_user: deploy
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: latest
+
+    - name: Upload nginx config
+      copy:
+        src: nginx_config
+        dest: /etc/nginx/sites-available/covid
+      notify:
+        - Restart nginx
+
+    - name: Disable default nginx config
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify:
+        - Restart nginx
+
+    - name: Enable nginx config
+      file:
+        src: /etc/nginx/sites-available/covid
+        dest: /etc/nginx/sites-enabled/covid
+        state: link
+      notify:
+        - Restart nginx
+
+    - name: Allow OpenSSH through the firewall
+      ufw:
+        rule: allow
+        name: OpenSSH
+    
+    - name: Allow all access to tcp port 80 and 90
+      ufw:
+        rule: allow
+        port: 80:90
+        proto: tcp
+    
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+  handlers:
+    - name: Restart nginx
+      service: name=nginx state=restarted

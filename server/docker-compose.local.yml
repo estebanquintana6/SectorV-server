@@ -1,0 +1,44 @@
+version: '3'
+services:
+  db:
+    image: mongo
+    environment:
+      NODE_ENV: development
+      MONGO_INITDB_ROOT_USERNAME: PgFhF8vVZSa3PCPWhw2s8Nns65mhDP3mXhNkjheq
+      MONGO_INITDB_ROOT_PASSWORD: PBVcuCGWkaJn7k6kRCUebUWxGERH3gDpEF4NNpp4xKp2tdQvVrr7phMZJpRtfSC8B5an5g6GWssGcCAFnQxLCW3mCV3pgMGpyEQYuwh2jdGbFKJy7patC2pf3Ca95h2J
+    command: mongod --port 27017
+    volumes:
+      - beta-mongo-db:/data/db
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_SERVER: db
+      ME_CONFIG_MONGODB_ADMINUSERNAME: PgFhF8vVZSa3PCPWhw2s8Nns65mhDP3mXhNkjheq
+      ME_CONFIG_MONGODB_ADMINPASSWORD: PBVcuCGWkaJn7k6kRCUebUWxGERH3gDpEF4NNpp4xKp2tdQvVrr7phMZJpRtfSC8B5an5g6GWssGcCAFnQxLCW3mCV3pgMGpyEQYuwh2jdGbFKJy7patC2pf3Ca95h2J
+  web:
+    image: template-backend
+    command: sh -c "yarn install && npm run start"
+    environment:
+      MONGO_USER: PgFhF8vVZSa3PCPWhw2s8Nns65mhDP3mXhNkjheq
+      MONGO_PSWD: PBVcuCGWkaJn7k6kRCUebUWxGERH3gDpEF4NNpp4xKp2tdQvVrr7phMZJpRtfSC8B5an5g6GWssGcCAFnQxLCW3mCV3pgMGpyEQYuwh2jdGbFKJy7patC2pf3Ca95h2J
+      MONGO_URI: db
+      MONGO_PORT: 27017
+      MONGO_DB: beta-db
+      MONGO_AUTH_DB: admin
+      NODE_ENV: development
+
+      JWT_SECRET: secret
+      JWT_EXPIRY: 30d
+    volumes:
+      - .:/app/server
+      - backend_node_modules:/app/server/node_modules
+    ports:
+    - "4000:4000"
+    depends_on:
+    - db
+volumes:
+  backend_node_modules:
+  beta-mongo-db:
